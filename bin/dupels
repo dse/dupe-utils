@@ -3,36 +3,34 @@ set -o errexit
 set -o pipefail
 set -o nounset
 shopt -s lastpipe
-declare -a findopts
-findopts=()                     # find's actual options
+declare -a findcmd
+findcmd=(find)
 while (( $# )) ; do
     case "$1" in
-        -H) findopts+=(-H); shift;;
-        -L) findopts+=(-L); shift;;
-        -P) findopts+=(-P); shift;;
-        -O) findopts+=(-O); shift;
+        -H) findcmd+=(-H); shift;;
+        -L) findcmd+=(-L); shift;;
+        -P) findcmd+=(-P); shift;;
+        -O) findcmd+=(-O); shift;
             if (( !$# )) ; then >&2 echo "required argument missing: -O" ; exit 1 ; fi
-            findopts+=("$1"); shift;;
-        -D) findopts+=(-D); shift;
+            findcmd+=("$1"); shift;;
+        -D) findcmd+=(-D); shift;
             if (( !$# )) ; then >&2 echo "required argument missing: -D" ; exit 1 ; fi
-            findopts+=("$1"); shift;;
-        -O*) findopts+=("$1"); shift;;
-        -D*) findopts+=("$1"); shift;;
+            findcmd+=("$1"); shift;;
+        -O*) findcmd+=("$1"); shift;;
+        -D*) findcmd+=("$1"); shift;;
         *)  break;;
     esac
 done
-declare -a dirs=()              # directories for find
+nodirs=1
 while (( $# )) ; do
     case "$1" in
         -*)  break;;            # rest of args start an expression
         '(') break;;            # ditto
         '!') break;;            # ditto
-        *)   dirs+=("$1"); shift;;
+        *)   nodirs=0; findcmd+=("$1"); shift;;
     esac
 done
-if (( !${#dirs[@]} )) ; then    # default is cwd
-    dirs=(.)
+if (( nodirs )) ; then
+    findcmd+=(.)
 fi
-
-exec find "${findopts[@]}" "${dirs[@]}" -type f "$@" -printf 'v1 %D %i %s %p\n'
-# v1: dev ino size filename
+exec "${findcmd[@]}" -type f "$@" -printf 'v1 %D %i %s %p\n'
