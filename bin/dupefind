@@ -1,41 +1,134 @@
-#!/usr/bin/env bash
-set -o errexit
-set -o pipefail
-set -o nounset
-shopt -s lastpipe
-
-# first arguments are find's options.  any subsequent arguments are
-# starting points for find (i.e., directories) and/or expression
-# arguments (e.g., -type f).
-declare -a findopts=()
-while (( $# )) ; do
-    case "$1" in
-        -H) findopts+=(-H); shift;;
-        -L) findopts+=(-L); shift;;
-        -P) findopts+=(-P); shift;;
-        -O) findopts+=(-O); shift;
-            if (( !$# )) ; then >&2 echo "required argument missing: -O" ; exit 1 ; fi
-            findopts+=("$1"); shift;;
-        -D) findopts+=(-D); shift;
-            if (( !$# )) ; then >&2 echo "required argument missing: -D" ; exit 1 ; fi
-            findopts+=("$1"); shift;;
-        -O*) findopts+=("$1"); shift;;
-        -D*) findopts+=("$1"); shift;;
-        *)  break;;
-    esac
-done
-
-# starting points, i.e., directory trees
-declare -a dirs=()
-while (( $# )) ; do
-    case "$1" in
-        -*) break;;
-        *) dirs+=("$1"); shift;;
-    esac
-done
-if (( !${#dirs[@]} )) ; then
-    dirs=(.)
-fi
-
-exec find "${findopts[@]}" "${dirs[@]}" -type f "$@" -printf 'v1 %D %i %s %Ts %p\n'
-# v1: %D dev %i ino %s bytes %Ts mtime %p filename
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use open qw(:locale);
+use Fcntl qw(SEEK_SET);
+our $MAXOPEN = 16;
+our $BYTES = 4096;
+our $touched_counter = 0;
+our %fh;
+our %touched;
+my %dev_ino_file;               # list of filenames by devino
+my %file_dev_ino;               # each file's devino
+my %size_dev_ino;               # list of devinos with size of size
+while (<>) {
+    s{\R\z}{};
+    my ($ver, @fields) = split();
+    my ($dev, $ino, $size, $filename);
+    if ($ver eq 'v1') {
+        ($dev, $ino, $size, $filename) = @fields;
+    } else {
+        next;
+    }
+    my $dev_ino = $dev . $; . $ino;
+    push(@{$dev_ino_file{$dev_ino}}, $filename);
+    $file_dev_ino{$filename} = $dev_ino;
+    push(@{$size_dev_ino{$size}}, $dev_ino);
+}
+# decreasing order
+my @sizes = sort { $b <=> $a } keys %size_dev_ino;
+foreach my $size (@sizes) {
+    my @dev_ino = @{$size_dev_ino{$size}};
+    next if scalar @dev_ino < 2;
+    my @filenames = map { $dev_ino_file{$_}[0] } @dev_ino;
+    next if scalar @filenames < 2;
+    my @dupe_groups = group_dupes(@filenames);
+    foreach my $group (@dupe_groups) {
+        my @filenames = @$group;
+        my $keep = shift(@filenames);
+        printf("## %s (%d)\n", $keep, $size);
+        foreach my $filename (@filenames) {
+            printf("rm %s\n", shellquote($filename));
+        }
+    }
+}
+sub group_dupes {
+    my (@filenames) = @_;
+    my %done;
+    my $offset = 0;
+    my @results;                 # collects groups of duplicate filenames
+    my @groups = ([@filenames]); # initialize with one group
+    while (1) {
+        my @newgroups;
+        foreach my $group (@groups) {
+            my @done;
+            my %group;
+            foreach my $filename (@$group) {
+                my $data;
+                my $fh = get_fh($filename, $offset);
+                next if !defined $fh;
+                my $bytes = sysread($fh, $data, $BYTES);
+                $touched{$filename} = ++$touched_counter;
+                if (!defined $bytes) {
+                    close($fh);
+                    delete $fh{$filename};
+                } elsif (!$bytes) {
+                    close($fh);
+                    delete $fh{$filename};
+                    push(@done, $filename);
+                } else {
+                    push(@{$group{$data}}, $filename) if defined $data;
+                }
+            }
+            if (scalar @done > 2) {
+                push(@results, [@done]);
+            }
+            foreach my $key (keys %group) {
+                my $group = $group{$key};
+                if (scalar @$group >= 2) {
+                    push(@newgroups, $group);
+                }
+            }
+        }
+        if (!scalar @newgroups) {
+            return @results if wantarray;
+            return [@results];
+        }
+        @groups = @newgroups;
+        $offset += $BYTES;
+    }
+}
+sub get_fh {
+    my ($filename, $offset) = @_;
+    my $fh = $fh{$filename};
+    return $fh if defined $fh;
+    if (scalar(keys(%fh)) >= $MAXOPEN) {
+        my @touched_filenames = sort { $touched{$a} <=> $touched{$b} } keys %fh;
+        my $count = scalar(keys(%fh)) - $MAXOPEN + 1;
+        my @oldest_filenames = splice(@touched_filenames, 0, $count);
+        foreach my $filename (@oldest_filenames) {
+            close($fh{$filename}) if defined $fh{$filename};
+            delete $fh{$filename};
+        }
+    }
+    if (!open($fh, '<:raw', $filename)) {
+        warn("$filename: $!\n");
+        return;
+    }
+    if ($offset) {
+        my $real_offset = sysseek($fh, $offset, SEEK_SET);
+        if ($real_offset != $offset) {
+            close($fh);
+            delete $fh{$filename};
+            return;
+        }
+    }
+    $fh{$filename} = $fh;
+    return $fh;
+}
+sub touch_fh {
+    my ($filename) = @_;
+    $touched{$filename} = ++$touched_counter;
+}
+sub shellquote {
+    my ($string) = @_;
+    for ($string) {
+        # stolen from String::ShellQuote to reduce dependencies
+        s/'/'\\''/g;
+        s|((?:'\\''){2,})|q{'"} . (q{'} x (length($1) / 4)) . q{"'}|ge;
+        $_ = "'$_'";
+        s/^''//;
+        s/''$//;
+    }
+    return $string;
+}
