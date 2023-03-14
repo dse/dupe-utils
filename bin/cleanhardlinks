@@ -1,0 +1,49 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use open qw(:locale);
+use File::Find qw(find);
+use File::Spec::Functions qw(abs2rel rel2abs);
+use Getopt::Long;
+our $dry_run;
+our $verbose;
+Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
+Getopt::Long::GetOptions(
+    'n|dry-run' => \$dry_run,
+    'v|verbose+' => \$verbose,
+) or die(":-(\n");
+my @dirs = @ARGV;
+while (scalar @dirs >= 2) {
+    cleanup(@dirs);
+    shift(@dirs);
+}
+sub cleanup {
+    my ($base_dir, @other_dirs) = @_;
+    find({
+        wanted => sub {
+            my ($dev, $ino, $mode, $nlink, $uid, $gid,
+                $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = lstat($_);
+            return if !defined $dev || !defined $ino;
+            return if !-f _;
+            return if $nlink < 2;
+            my $rel = abs2rel($File::Find::name, $base_dir);
+            foreach my $other_dir (@other_dirs) {
+                my $abs = rel2abs($rel, $other_dir);
+                my ($dev2, $ino2) = lstat($abs);
+                next if !defined $dev2 || !defined $ino2;
+                if ($dev == $dev2 && $ino == $ino2) {
+                    if ($dry_run) {
+                        print("[DRY RUN]: rm $abs\n");
+                    } else {
+                        if (!unlink($abs)) {
+                            warn("rm $abs: $!\n");
+                        } elsif ($verbose) {
+                            warn("removed $abs\n");
+                        }
+                    }
+                }
+            }
+        },
+        no_chdir => 1,
+    }, $base_dir);
+}
