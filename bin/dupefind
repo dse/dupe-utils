@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -o errexit
+set -o pipefail
+set -o nounset
+shopt -s lastpipe
+
+# first arguments are find's options.  any subsequent arguments are
+# starting points for find (i.e., directories) and/or expression
+# arguments (e.g., -type f).
+declare -a findopts=()
+while (( $# )) ; do
+    case "$1" in
+        -H) findopts+=(-H); shift;;
+        -L) findopts+=(-L); shift;;
+        -P) findopts+=(-P); shift;;
+        -O) findopts+=(-O); shift;
+            if (( !$# )) ; then >&2 echo "required argument missing: -O" ; exit 1 ; fi
+            findopts+=("$1"); shift;;
+        -D) findopts+=(-D); shift;
+            if (( !$# )) ; then >&2 echo "required argument missing: -D" ; exit 1 ; fi
+            findopts+=("$1"); shift;;
+        -O*) findopts+=("$1"); shift;;
+        -D*) findopts+=("$1"); shift;;
+        *)  break;;
+    esac
+done
+
+# starting points, i.e., directory trees
+declare -a dirs=()
+while (( $# )) ; do
+    case "$1" in
+        -*) break;;
+        *) dirs+=("$1"); shift;;
+    esac
+done
+if (( !${#dirs[@]} )) ; then
+    dirs=(.)
+fi
+
+exec find "${findopts[@]}" "${dirs[@]}" -type f "$@" -printf 'v1 %D %i %s %Ts %p\n'
+# v1: %D dev %i ino %s bytes %Ts mtime %p filename
