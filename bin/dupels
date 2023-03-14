@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -o errexit
+set -o pipefail
+set -o nounset
+shopt -s lastpipe
+declare -a findopts=()          # find's actual options
+while (( $# )) ; do
+    case "$1" in
+        -H) findopts+=(-H); shift;;
+        -L) findopts+=(-L); shift;;
+        -P) findopts+=(-P); shift;;
+        -O) findopts+=(-O); shift;
+            if (( !$# )) ; then >&2 echo "required argument missing: -O" ; exit 1 ; fi
+            findopts+=("$1"); shift;;
+        -D) findopts+=(-D); shift;
+            if (( !$# )) ; then >&2 echo "required argument missing: -D" ; exit 1 ; fi
+            findopts+=("$1"); shift;;
+        -O*) findopts+=("$1"); shift;;
+        -D*) findopts+=("$1"); shift;;
+        *)  break;;
+    esac
+done
+declare -a dirs=()              # directories for find
+while (( $# )) ; do
+    case "$1" in
+        -*)  break;;            # rest of args start an expression
+        '(') break;;            # ditto
+        '!') break;;            # ditto
+        *)   dirs+=("$1"); shift;;
+    esac
+done
+if (( !${#dirs[@]} )) ; then    # default is cwd
+    dirs=(.)
+fi
+
+exec find "${findopts[@]}" "${dirs[@]}" -type f "$@" -printf 'v1 %D %i %s %p\n'
+# v1: dev ino size filename
