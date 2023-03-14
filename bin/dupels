@@ -3,7 +3,8 @@ set -o errexit
 set -o pipefail
 set -o nounset
 shopt -s lastpipe
-declare -a findopts=()          # find's actual options
+declare -a findopts
+findopts=()                     # find's actual options
 while (( $# )) ; do
     case "$1" in
         -H) findopts+=(-H); shift;;
