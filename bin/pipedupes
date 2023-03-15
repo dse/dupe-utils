@@ -36,7 +36,7 @@ foreach my $size (@sizes) {
     next if scalar @filenames < 2;
     my @dupe_groups = group_dupes(@filenames);
     foreach my $group (@dupe_groups) {
-        my @filenames = @$group;
+        my @filenames = sort @$group;
         my $keep = shift(@filenames);
         printf("## %s (%d)\n", $keep, $size);
         foreach my $filename (@filenames) {

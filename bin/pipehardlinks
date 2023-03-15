@@ -17,7 +17,7 @@ while (<>) {
 foreach my $dev_ino (keys %dev_ino_file) {
     my $filenames = delete $dev_ino_file{$dev_ino};
     next if scalar @$filenames < 2;
-    my @filenames = sort { $a cmp $b } @$filenames;
+    my @filenames = sort @$filenames;
     my $main_filename = shift(@filenames);
     printf("## %s (%s)\n", shellquote($main_filename), $dev_ino);
     printf("rm %s\n", shellquote($_)) foreach @filenames;
