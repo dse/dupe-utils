@@ -21,8 +21,7 @@ sub cleanup {
     my ($base_dir, @other_dirs) = @_;
     find({
         wanted => sub {
-            my ($dev, $ino, $mode, $nlink, $uid, $gid,
-                $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = lstat($_);
+            my ($dev, $ino, $mode, $nlink) = lstat($_);
             return if !defined $dev || !defined $ino;
             return if !-f _;
             return if $nlink < 2;
