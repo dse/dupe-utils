@@ -1,7 +1,6 @@
 #!/usr/bin/env perl
 use warnings;
 use strict;
-use open qw(:locale);
 STDERR->autoflush(1);
 while (<>) {
     printf STDERR ("\r\e[K%d", $.);
