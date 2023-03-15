@@ -19,8 +19,8 @@ foreach my $dev_ino (keys %dev_ino_file) {
     next if scalar @$filenames < 2;
     my @filenames = sort { $a cmp $b } @$filenames;
     my $main_filename = shift(@filenames);
-    printf("# keep %s (%s)\n", shellquote($main_filename), $dev_ino);
-    printf("rm     %s\n", shellquote($_)) foreach @filenames;
+    printf("## %s (%s)\n", shellquote($main_filename), $dev_ino);
+    printf("rm %s\n", shellquote($_)) foreach @filenames;
 }
 sub dev_ino {
     my ($filename) = @_;
