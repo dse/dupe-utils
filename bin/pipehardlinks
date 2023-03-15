@@ -11,8 +11,7 @@ while (<>) {
     } else {
         next;
     }
-    my $key = "${dev},${ino}";
-    push(@{$dev_ino_file{$key}}, $filename);
+    push(@{$dev_ino_file{"$dev,$ino"}}, $filename);
 }
 foreach my $dev_ino (keys %dev_ino_file) {
     my $filenames = delete $dev_ino_file{$dev_ino};
@@ -21,12 +20,6 @@ foreach my $dev_ino (keys %dev_ino_file) {
     my $main_filename = shift(@filenames);
     printf("## %s (%s)\n", shellquote($main_filename), $dev_ino);
     printf("rm %s\n", shellquote($_)) foreach @filenames;
-}
-sub dev_ino {
-    my ($filename) = @_;
-    my ($dev, $ino) = lstat($_);
-    return if !defined $dev || !defined $ino;
-    return wantarray ? ($dev, $ino) : "${dev},${ino}";
 }
 sub shellquote {
     my ($string) = @_;
