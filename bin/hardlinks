@@ -1,19 +1,10 @@
 #!/usr/bin/env perl
 use warnings;
 use strict;
-use open qw(:locale);
 use File::Find qw(find);
 use File::Spec::Functions qw(abs2rel rel2abs);
 use Getopt::Long;
 STDOUT->autoflush(1);
-STDERR->autoflush(1);
-our $dry_run;
-our $verbose;
-Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
-Getopt::Long::GetOptions(
-    'n|dry-run' => \$dry_run,
-    'v|verbose+' => \$verbose,
-) or die(":-(\n");
 my @dirs = @ARGV;
 while (scalar @dirs >= 2) {
     cleanup(@dirs);
@@ -33,9 +24,7 @@ sub cleanup {
                 my ($dev2, $ino2, $mode2, $nlink2) = lstat($abs);
                 next if !defined $dev2 || !defined $ino2 || $nlink2 < 2;
                 next if $dev2 != $dev || $ino2 != $ino;
-                if (!$keep++) {
-                    printf("## %s (%s,%s)\n", shellquote($abs), $dev, $ino);
-                }
+                printf("## %s (%s,%s)\n", shellquote($abs), $dev, $ino) if !$keep++;
                 printf("rm %s\n", shellquote($abs));
             }
         },
