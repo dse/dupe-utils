@@ -5,6 +5,7 @@ use open qw(:locale);
 use File::Find qw(find);
 use File::Spec::Functions qw(abs2rel rel2abs);
 use Getopt::Long;
+STDOUT->autoflush(1);
 our $dry_run;
 our $verbose;
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
