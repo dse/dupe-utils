@@ -2,6 +2,8 @@
 use warnings;
 use strict;
 use open qw(:locale);
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
 use Fcntl qw(SEEK_SET);
 our $MAXOPEN = 16;
 our $BYTES = 4096;
