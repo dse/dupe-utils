@@ -12,6 +12,7 @@ while (<>) {
         next;
     }
     push(@{$dev_ino_file{"$dev,$ino"}}, $filename);
+    #                     ^^^^^^^^^ gets printed
 }
 foreach my $dev_ino (keys %dev_ino_file) {
     my $filenames = delete $dev_ino_file{$dev_ino};
