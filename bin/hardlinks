@@ -6,6 +6,10 @@ use File::Spec::Functions qw(abs2rel rel2abs);
 use Getopt::Long;
 STDOUT->autoflush(1);
 my @dirs = @ARGV;
+#
+# cleanup dir1 dir2 dir3
+# cleanup dir2 dir3
+#
 while (scalar @dirs >= 2) {
     cleanup(@dirs);
     shift(@dirs);
@@ -13,14 +17,17 @@ while (scalar @dirs >= 2) {
 sub cleanup {
     my ($base_dir, @other_dirs) = @_;
     my $file_counter = 0;
+    my $prefix = "$base_dir/";
+    my $prefixlen = length($prefix);
     find({
         wanted => sub {
             my ($dev, $ino, $mode, $nlink) = lstat($_);
             return if !defined $dev || !defined $ino || !-f _ || $nlink < 2;
-            my $rel = abs2rel($File::Find::name, $base_dir);
+            return if substr($File::Find::name, 0, $prefixlen) ne $prefix;
+            my $rel = substr($File::Find::name, $prefixlen);
             my $keep = 0;
             foreach my $other_dir (@other_dirs) {
-                my $abs = rel2abs($rel, $other_dir);
+                my $abs = "$other_dir/$rel";
                 my ($dev2, $ino2, $mode2, $nlink2) = lstat($abs);
                 next if !defined $dev2 || !defined $ino2 || $nlink2 < 2;
                 next if $dev2 != $dev || $ino2 != $ino;
