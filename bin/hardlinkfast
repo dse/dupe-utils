@@ -1,0 +1,47 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use File::Find qw(find finddepth);
+use Getopt::Long;
+our $force = 0;
+our $verbose = 0;
+Getopt::Long::Configure(qw());
+Getopt::Long::GetOptions(
+    'f|force' => \$force,
+    'v|verbose+' => \$verbose,
+) or die(":-(\n");
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+foreach my $dir (@ARGV) {
+    finddepth({
+        preprocess => \&preprocess,
+        wanted => \&wanted,
+    }, $dir);
+}
+sub wanted {
+    my @lstat = lstat($_);
+    return unless scalar @lstat;
+    if (-d _) {
+        rmdir($_);
+        return;
+    }
+    if (!-f _) {
+        return;
+    }
+    my (undef, undef, undef, $nlink) = @lstat;
+    if ($nlink < 2) {
+        return;
+    }
+    if ($force) {
+        if (unlink($_)) {
+            warn("rm $File::Find::name\n") if $verbose;
+        } else {
+            warn("$File::Find::name: $!\n");
+        }
+    } else {
+        warn("rm $File::Find::name\n");
+    }
+}
+sub preprocess {
+    return sort @_;
+}
