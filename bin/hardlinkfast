@@ -1,9 +1,14 @@
 #!/usr/bin/env perl
-## no critic (ProhibitInteractiveTest)
 use warnings;
 use strict;
+
 use File::Find qw(find finddepth);
 use Getopt::Long;
+use FindBin;
+
+use lib "${FindBin::Bin}/../lib";
+use My::Cleanup::HardLinks::Fast;
+
 our $force = 0;
 our $verbose = 0;
 our $progress = 0;
@@ -13,55 +18,8 @@ Getopt::Long::GetOptions(
     'v|verbose+' => \$verbose,
     'p|progress' => \$progress,
 ) or die(":-(\n");
-STDOUT->autoflush(1);
-STDERR->autoflush(1);
-use FindBin;
-use lib "${FindBin::Bin}/../lib";
-use My::Progress qw(clear_progress incr_progress cols_progress);
-$My::Progress::enabled = $progress;
-$My::Progress::total2 = scalar @ARGV if scalar @ARGV > 1;
-our $i = 0;
-cols_progress();
-foreach my $dir (@ARGV) {
-    $My::Progress::counter2 += 1 if scalar @ARGV > 1;
-    finddepth({
-        preprocess => \&preprocess,
-        wanted => \&wanted,
-    }, $dir);
-}
-clear_progress();
 
-sub wanted {
-    incr_progress($File::Find::name);
-    my @lstat = lstat($_);
-    return unless scalar @lstat;
-    if (-d _) {
-        if (rmdir($_)) {
-            clear_progress();
-            warn("rmdir $File::Find::name\n") if $verbose;
-        }
-        return;
-    }
-    if (!-f _) {
-        return;
-    }
-    my (undef, undef, undef, $nlink) = @lstat;
-    if ($nlink < 2) {
-        return;
-    }
-    if ($force) {
-        if (unlink($_)) {
-            clear_progress() if $verbose;
-            warn("rm $File::Find::name\n") if $verbose;
-        } else {
-            clear_progress();
-            warn("$File::Find::name: $!\n");
-        }
-    } else {
-        clear_progress();
-        warn("rm $File::Find::name\n");
-    }
-}
-sub preprocess {
-    return sort @_;             ## no critic (ProhibitReturnSort)
-}
+my $cleanup = My::Cleanup::HardLinks::Fast->new(force => $force,
+                                                verbose => $verbose,
+                                                progress => $progress);
+$cleanup->run(@ARGV);
