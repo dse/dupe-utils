@@ -1,4 +1,5 @@
 package My::Cleanup::HardLinks::Fast;
+## no critic (ProhibitInteractiveTest)
 use warnings;
 use strict;
 
@@ -6,6 +7,7 @@ use FindBin;
 use lib "${FindBin::Bin}/../../../../lib";
 
 use My::Progress;
+use File::Find qw(finddepth);
 
 sub new {
     my ($class, %args) = @_;
@@ -16,19 +18,28 @@ sub new {
 sub run {
     my ($self, @dir) = @_;
 
-    my $progress = $self->{progress} ? My::Progress->new(
+    my $progress = $self->{progress} && -t 2 ? My::Progress->new(
         enabled => 1,
-        total2  => scalar @dir,
+        total2 => ((scalar @dir > 1) ? (scalar @dir) : undef),
+        suffix => 'files',
+        suffix2 => 'trees',
+        counter3 => 0,
+        suffix3 => 'files rmed',
+        counter4 => 0,
+        suffix4 => 'dirs rmed',
     ) : undef;
 
     my $wanted = sub {
-        $progress->incr() if defined $progress;
+        $progress->incr($File::Find::name) if defined $progress;
         my @lstat = lstat($_);
         return unless scalar @lstat;
         if (-d _) {
             if (rmdir($_)) {
-                $progress->clear() if defined $progress;
-                warn("rmdir $File::Find::name\n") if $self->{verbose};
+                $progress->incr4() if defined $progress;
+                if ($self->{verbose}) {
+                    $progress->clear() if defined $progress;
+                    warn("rmdir $File::Find::name\n");
+                }
             }
             return;
         }
@@ -41,8 +52,11 @@ sub run {
         }
         if ($self->{force}) {
             if (unlink($_)) {
-                $progress->clear() if defined $progress && $self->{verbose};
-                warn("rm $File::Find::name\n") if $self->{verbose};
+                $progress->incr3() if defined $progress;
+                if ($self->{verbose}) {
+                    $progress->clear() if defined $progress;
+                    warn("rm $File::Find::name\n");
+                }
             } else {
                 $progress->clear() if defined $progress;
                 warn("$File::Find::name: $!\n");

@@ -17,7 +17,7 @@ sub new {
 
 sub incr {
     return if !-t 2;
-    my ($self) = @_;
+    my $self = shift;
     return if !$self->{enabled};
 
     $self->{counter} //= 0;
@@ -29,8 +29,20 @@ sub incr {
 
     my $line1 = '' . $self->{counter};
     $line1 .= "/" . $self->{total}    if defined $self->{total};
+    $line1 .= " " . $self->{suffix}   if defined $self->{suffix};
+
     $line1 .= " " . $self->{counter2} if defined $self->{counter2};
     $line1 .= "/" . $self->{total2}   if defined $self->{total2};
+    $line1 .= " " . $self->{suffix2}  if defined $self->{suffix2};
+
+    $line1 .= " " . $self->{counter3} if defined $self->{counter3};
+    $line1 .= "/" . $self->{total3}   if defined $self->{total3};
+    $line1 .= " " . $self->{suffix3}  if defined $self->{suffix3};
+
+    $line1 .= " " . $self->{counter4} if defined $self->{counter4};
+    $line1 .= "/" . $self->{total4}   if defined $self->{total4};
+    $line1 .= " " . $self->{suffix4}  if defined $self->{suffix4};
+
     if (!scalar @_) {
         return p("\r${line1}\e[K");
     }
@@ -51,6 +63,24 @@ sub incr2 {
 
     $self->{counter2} //= 0;
     ++$self->{counter2};
+}
+
+sub incr3 {
+    return if !-t 2;
+    my ($self) = @_;
+    return if !$self->{enabled};
+
+    $self->{counter3} //= 0;
+    ++$self->{counter3};
+}
+
+sub incr4 {
+    return if !-t 2;
+    my ($self) = @_;
+    return if !$self->{enabled};
+
+    $self->{counter4} //= 0;
+    ++$self->{counter4};
 }
 
 sub clear {
