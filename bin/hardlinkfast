@@ -29,6 +29,8 @@ foreach my $dir (@ARGV) {
         wanted => \&wanted,
     }, $dir);
 }
+clear_progress();
+
 sub wanted {
     incr_progress($File::Find::name);
     my @lstat = lstat($_);
@@ -60,7 +62,6 @@ sub wanted {
         warn("rm $File::Find::name\n");
     }
 }
-clear_progress();
 sub preprocess {
     return sort @_;             ## no critic (ProhibitReturnSort)
 }
