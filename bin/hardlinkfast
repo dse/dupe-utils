@@ -1,28 +1,43 @@
 #!/usr/bin/env perl
+## no critic (ProhibitInteractiveTest)
 use warnings;
 use strict;
 use File::Find qw(find finddepth);
 use Getopt::Long;
 our $force = 0;
 our $verbose = 0;
+our $progress = 0;
 Getopt::Long::Configure(qw());
 Getopt::Long::GetOptions(
     'f|force' => \$force,
     'v|verbose+' => \$verbose,
+    'p|progress' => \$progress,
 ) or die(":-(\n");
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+use My::Progress qw(clear_progress incr_progress cols_progress);
+$My::Progress::enabled = $progress;
+$My::Progress::total2 = scalar @ARGV if scalar @ARGV > 1;
+our $i = 0;
+cols_progress();
 foreach my $dir (@ARGV) {
+    $My::Progress::counter2 += 1 if scalar @ARGV > 1;
     finddepth({
         preprocess => \&preprocess,
         wanted => \&wanted,
     }, $dir);
 }
 sub wanted {
+    incr_progress($File::Find::name);
     my @lstat = lstat($_);
     return unless scalar @lstat;
     if (-d _) {
-        rmdir($_);
+        if (rmdir($_)) {
+            clear_progress();
+            warn("rmdir $File::Find::name\n") if $verbose;
+        }
         return;
     }
     if (!-f _) {
@@ -34,14 +49,18 @@ sub wanted {
     }
     if ($force) {
         if (unlink($_)) {
+            clear_progress() if $verbose;
             warn("rm $File::Find::name\n") if $verbose;
         } else {
+            clear_progress();
             warn("$File::Find::name: $!\n");
         }
     } else {
+        clear_progress();
         warn("rm $File::Find::name\n");
     }
 }
+clear_progress();
 sub preprocess {
-    return sort @_;
+    return sort @_;             ## no critic (ProhibitReturnSort)
 }
