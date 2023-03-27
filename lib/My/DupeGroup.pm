@@ -1,40 +1,44 @@
 package My::DupeGroup;
 use warnings;
 use strict;
+no strict 'refs';      ## no critic (ProhibitNoStrict) [for FileCache]
+
 use base 'Exporter';
 our @EXPORT = qw();
 our @EXPORT_OK = qw(group_dupes);
+
 use Fcntl qw(SEEK_SET);
+
 our $MAXOPEN = 16;
 our $BYTES = 4096;
 our $touched_counter = 0;
-our %fh;
-our %touched;
+
+use FindBin;
+use lib "${FindBin::Bin}/../../lib";
+
+use My::FileCache qw(cache_open cache_close cache_close_all);
+
 sub group_dupes {
     my (@filenames) = @_;
-    my %done;
     my $offset = 0;
-    my @results;                 # collects groups of duplicate filenames
+    my @results;                 # collects groups of duplicate files
     my @groups = ([@filenames]); # initialize with one group
     while (1) {
         my @newgroups;
         foreach my $group (@groups) {
-            my @done;
-            my %group;
+            my @done;           # all files in this group that are done
+            my %group;          # group by next chunk of contents
             foreach my $filename (@$group) {
-                my $data;
-                my $fh = get_fh($filename, $offset);
+                my $fh = cache_open($filename);
                 next if !defined $fh;
+                my $data;
                 my $bytes = sysread($fh, $data, $BYTES);
-                $touched{$filename} = ++$touched_counter;
-                if (!defined $bytes) {
-                    close($fh);
-                    delete $fh{$filename};
-                } elsif (!$bytes) {
-                    close($fh);
-                    delete $fh{$filename};
+                if (!defined $bytes) { # error reading
+                    cache_close($fh);
+                } elsif (!$bytes) { # EOF, no more data
+                    cache_close($fh);
                     push(@done, $filename);
-                } else {
+                } else {        # we just read some data
                     push(@{$group{$data}}, $filename) if defined $data;
                 }
             }
@@ -49,6 +53,7 @@ sub group_dupes {
             }
         }
         if (!scalar @newgroups) {
+            cache_close_all();
             return @results if wantarray;
             return [@results];
         }
@@ -56,36 +61,5 @@ sub group_dupes {
         $offset += $BYTES;
     }
 }
-sub get_fh {
-    my ($filename, $offset) = @_;
-    my $fh = $fh{$filename};
-    return $fh if defined $fh;
-    if (scalar(keys(%fh)) >= $MAXOPEN) {
-        my @touched_filenames = sort { $touched{$a} <=> $touched{$b} } keys %fh;
-        my $count = scalar(keys(%fh)) - $MAXOPEN + 1;
-        my @oldest_filenames = splice(@touched_filenames, 0, $count);
-        foreach my $filename (@oldest_filenames) {
-            close($fh{$filename}) if defined $fh{$filename};
-            delete $fh{$filename};
-        }
-    }
-    if (!open($fh, '<:raw', $filename)) {
-        warn("$filename: $!\n");
-        return;
-    }
-    if ($offset) {
-        my $real_offset = sysseek($fh, $offset, SEEK_SET);
-        if ($real_offset != $offset) {
-            close($fh);
-            delete $fh{$filename};
-            return;
-        }
-    }
-    $fh{$filename} = $fh;
-    return $fh;
-}
-sub touch_fh {
-    my ($filename) = @_;
-    $touched{$filename} = ++$touched_counter;
-}
+
 1;
