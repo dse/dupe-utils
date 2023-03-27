@@ -7,7 +7,7 @@ use FindBin;
 use lib "${FindBin::Bin}/../../../../lib";
 
 use File::Find qw(finddepth);
-use Time::HiRes qw(gettimeofday);
+use My::Tick qw(tick);
 
 sub new {
     my ($class, %args) = @_;
@@ -29,14 +29,8 @@ sub run {
     my $total_trees = scalar @dir;
     my $last;
     my $wanted = sub {
-        if ($progress) {
-            ++$counter_found;
-            my $now = gettimeofday();
-            if (!defined $last || $now >= $last + 0.1) {
-                printf STDERR ("\r%d found; tree %d of %d; %d f; %d d \e[K", $counter_found, $counter_trees, $total_trees, $counter_rm, $counter_rmdir);
-                $last = $now;
-            }
-        }
+        ++$counter_found;
+        printf STDERR ("\r%d found; tree %d of %d; %d f; %d d \e[K", $counter_found, $counter_trees, $total_trees, $counter_rm, $counter_rmdir) if $progress && tick();
         my @lstat = lstat($_);
         return unless scalar @lstat;
         if (-d _) {
