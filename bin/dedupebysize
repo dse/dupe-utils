@@ -1,0 +1,121 @@
+#!/usr/bin/env perl
+## no critic (ProhibitInteractiveTest)
+use warnings;
+use strict;
+
+use File::Find qw(find);
+use Getopt::Long;
+use FindBin;
+
+use lib "${FindBin::Bin}/../lib";
+use My::DupeGroup qw(group_dupes);
+use My::ShellQuote qw(shell_quote);
+use Data::Dumper qw(Dumper);
+
+our $force    = 0;
+our $verbose  = 0;
+our $progress = 0;
+our $sort     = 0;
+our $dry_run  = 0;
+Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
+Getopt::Long::GetOptions(
+    'f|force'    => sub { $dry_run = 0; $force = 1; },
+    'v|verbose+' => \$verbose,
+    'p|progress' => \$progress,
+    's|sort'     => \$sort,
+    'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
+) or die(":-(\n");
+if (!$force && !$dry_run) {
+    die("either -f/--force or -n/--dry-run must be specified\n");
+}
+
+$progress &&= -t 2;
+
+warn("arguments: @ARGV\n");
+my @files = grep { -f $_ || $_ eq '-' } @ARGV;
+warn("files: @files\n");
+my @dirs  = grep { -d $_ } @ARGV;
+warn("dirs: @dirs\n");
+my $dirs_only = scalar @dirs && !scalar @files;
+
+my %by_size_dev_ino;
+my $counter_found = 0;
+my $counter_checked = 0;
+
+my $wanted = sub {
+    ++$counter_found;
+    printf STDERR ("\r%d found \e[K") if $progress && tick();
+    my @lstat = lstat($_);
+    return unless @lstat;
+    return if !-f _;
+    my $dev = $lstat[0];
+    my $ino = $lstat[1];
+    my $size = $lstat[7];
+    my $dev_ino = "$dev,$ino";
+    push(@{$by_size_dev_ino{$size}{$dev_ino}}, $File::Find::name);
+    print("$size $dev $ino $File::Find::name\n");
+};
+
+foreach my $dir (@dirs) {
+    find({ wanted => $wanted }, $dir);
+}
+printf STDERR ("\r\e[K%d found\n", $counter_found) if $progress;
+
+if (!$dirs_only) {
+    @ARGV = @files;
+    while (<>) {
+        s{\R\z}{};
+        my ($ver, @data) = split();
+        if ($ver eq 'v1') {
+            ++$counter_checked;
+            printf STDERR ("\r%d checked \e[K", $counter_checked) if $progress && tick();
+            my ($dev, $ino, $size, $pathname) = @data;
+            my $dev_ino = "$dev,$ino";
+            push(@{$by_size_dev_ino{$size}{$dev_ino}}, $pathname);
+            print("$size $dev $ino $pathname\n");
+        }
+    }
+    printf STDERR ("\r\e[K%d checked\n", $counter_checked) if $progress;
+}
+
+foreach my $size (sort { $b <=> $a } keys %by_size_dev_ino) {
+    warn("finding duplicate $size-byte files\n");
+    my $by_dev_ino = $by_size_dev_ino{$size};
+    next if scalar keys %$by_dev_ino < 1; # really, 2
+    my @dev_ino = sort keys %$by_dev_ino;
+    next if scalar @dev_ino < 1; # really, 2
+    my %dev_ino;
+    foreach my $dev_ino (@dev_ino) {
+        foreach my $filename (@{$by_dev_ino->{$dev_ino}}) {
+            $dev_ino{$filename} = $dev_ino;
+        }
+    }
+    my @files = map { $by_dev_ino->{$_}->[0] } @dev_ino;
+    my @groups = group_dupes(@files);
+    foreach my $group (sort { $a->[0] cmp $b->[0] } @groups) {
+        my ($first, @other) = sort @$group;
+        if ($force) {
+            foreach my $other (@other) {
+                my $dev_ino = $dev_ino{$other};
+                my @unlink = sort @{$by_dev_ino->{$dev_ino}};
+                foreach my $unlink (@unlink) {
+                    if (!unlink($unlink)) {
+                        warn("$unlink: $!\n");
+                    } else {
+                        warn("rm $unlink\n") if $verbose;
+                    }
+                }
+            }
+        } else {
+            my $first_dev_ino = $dev_ino{$first};
+            foreach my $keep (sort @{$by_dev_ino->{$first_dev_ino}}) {
+                printf("# keep %s # %s\n", shell_quote($keep), $first_dev_ino);
+            }
+            foreach my $other (@other) {
+                my $dev_ino = $dev_ino{$other};
+                my @unlink = sort @{$by_dev_ino->{$dev_ino}};
+                printf("rm     %s # %s\n", shell_quote($_), $dev_ino) foreach @unlink;
+            }
+        }
+    }
+}
