@@ -42,7 +42,7 @@ sub group_dupes {
                     push(@{$group{$data}}, $filename) if defined $data;
                 }
             }
-            if (scalar @done > 2) {
+            if (scalar @done >= 2) {
                 push(@results, [@done]);
             }
             foreach my $key (keys %group) {
