@@ -9,14 +9,16 @@ use FindBin;
 use lib "${FindBin::Bin}/../lib";
 use My::Cleanup::HardLinks::Fast;
 
-our $force = 0;
-our $verbose = 0;
+our $force    = 0;
+our $verbose  = 0;
 our $progress = 0;
-Getopt::Long::Configure(qw());
+our $sort     = 0;
+Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
     'f|force' => \$force,
     'v|verbose+' => \$verbose,
     'p|progress' => \$progress,
+    's|sort'     => \$sort,
 ) or die(":-(\n");
 
 my $cleanup = My::Cleanup::HardLinks::Fast->new(force => $force,

@@ -6,7 +6,6 @@ use strict;
 use FindBin;
 use lib "${FindBin::Bin}/../../../../lib";
 
-use My::Progress;
 use File::Find qw(finddepth);
 
 sub new {
@@ -17,53 +16,58 @@ sub new {
 
 sub run {
     my ($self, @dir) = @_;
-
-    my $progress = $self->{progress} && -t 2 ? My::Progress->new(
-        enabled => 1,
-        total2 => ((scalar @dir > 1) ? (scalar @dir) : undef),
-        suffix => 'files',
-        suffix2 => 'trees',
-        counter3 => 0,
-        suffix3 => 'files rmed',
-        counter4 => 0,
-        suffix4 => 'dirs rmed',
-    ) : undef;
-
+    my $progress = -t 2 && $self->{progress};
+    my $force = $self->{force};
+    my $verbose = $self->{verbose};
+    my $sort = $self->{sort};
+    my $save_autoflush = $progress ? STDERR->autoflush(1) : undef;
+    my $counter = 0;
+    my $counter_rm = 0;
+    my $counter_rmdir = 0;
+    my $counter_trees = 0;
+    my $total_trees = scalar @dir;
     my $wanted = sub {
-        $progress->incr($File::Find::name) if defined $progress;
+        if ($progress) {
+            if (++$counter % 173 == 0) {
+                printf STDERR ("\r%d %d/%d %d f %d d\e[K", $counter, $counter_trees, $total_trees, $counter_rm, $counter_rmdir);
+            }
+        }
         my @lstat = lstat($_);
         return unless scalar @lstat;
         if (-d _) {
-            if (rmdir($_)) {
-                $progress->incr4() if defined $progress;
-                if ($self->{verbose}) {
-                    $progress->clear() if defined $progress;
-                    warn("rmdir $File::Find::name\n");
+            if ($force) {
+                if (rmdir($_)) {
+                    ++$counter_rmdir;
+                    if ($verbose) {
+                        print STDERR ("\r") if $progress && $verbose;
+                        warn("rmdir $File::Find::name\n") if $verbose;
+                    }
                 }
+            } else {
+                ++$counter_rmdir;
             }
             return;
         }
-        if (!-f _) {
-            return;
-        }
-        my (undef, undef, undef, $nlink) = @lstat;
-        if ($nlink < 2) {
-            return;
-        }
-        if ($self->{force}) {
+        return if (!-f _);
+        my $nlink = $lstat[3];
+        return if ($nlink < 2);
+        if ($force) {
             if (unlink($_)) {
-                $progress->incr3() if defined $progress;
-                if ($self->{verbose}) {
-                    $progress->clear() if defined $progress;
+                ++$counter_rm;
+                if ($verbose) {
+                    print STDERR "\r" if $progress;
                     warn("rm $File::Find::name\n");
                 }
             } else {
-                $progress->clear() if defined $progress;
+                print STDERR "\r" if $progress;
                 warn("$File::Find::name: $!\n");
             }
         } else {
-            $progress->clear() if defined $progress;
-            warn("rm $File::Find::name\n");
+            ++$counter_rm;
+            if ($verbose) {
+                print STDERR "\r" if $progress;
+                warn("rm $File::Find::name\n");
+            }
         }
     };
 
@@ -72,13 +76,15 @@ sub run {
     };
 
     foreach my $dir (@dir) {
-        $progress->incr2() if scalar @dir > 1;
+        ++$counter_trees if $progress;
         finddepth({
-            preprocess => $preprocess,
+            $sort ? (preprocess => $preprocess) : (),
             wanted => $wanted,
         }, $dir);
     }
-    $progress = undef;
+
+    print STDERR "\r" if $progress;
+    STDERR->autoflush($save_autoflush) if $progress;
 }
 
 1;
