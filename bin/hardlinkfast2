@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+exec find "$@" -depth \
+     \( -type f -links +1 -delete \) -o \
+     \( -type d -delete \)
