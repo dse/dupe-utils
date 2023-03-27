@@ -27,11 +27,12 @@ sub cleanup {
     my $prefixlen = length($prefix);
     warn("# finding files in $base_dir\n");
     my $count = 0;
-    find({
+    warn("# progress\n") if $progress && -t 2;
+    finddepth({
         preprocess => sub { return sort @_; }, # predictable order
         wanted => sub {
             $count += 1;
-            print STDERR ("\r\e[K  $count\r") if -t 2 && $progress && $count % 23 == 0;
+            print STDERR ("\e[K  $count\r") if -t 2 && $progress;
             my ($dev, $ino, $mode, $nlink) = lstat($_);
             return if !defined $dev || !defined $ino || !-f _ || $nlink < 2;
             return if substr($File::Find::name, 0, $prefixlen) ne $prefix;
