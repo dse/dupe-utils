@@ -36,6 +36,7 @@ sub cache_open {
         $seq{$file}++;
         return $fh{$file};
     }
+  tryagain:
     if (scalar keys %fh > $maxopen - 1) {
         # least recently used to most recently used
         my @lru = sort { $seq{$a} <=> $seq{$b} } keys %fh;
@@ -53,6 +54,15 @@ sub cache_open {
     }
     my $fh;
     if (!open($fh, '<:raw', $file)) {
+        $fh = undef;
+        if ($!{EMFILE} || $!{ENFILE}) { # see open(2)
+            if ($maxopen >= 8) {
+                $maxopen -= 4;
+                goto tryagain;
+            } else {
+                croak("$file: $! (too few open files)");
+            }
+        }
         croak("$file: $!");
     }
     $fh{$file} = $fh;
