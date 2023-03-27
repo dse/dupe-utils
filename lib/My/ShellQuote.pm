@@ -1,4 +1,4 @@
-package My::DupeGroup;
+package My::ShellQuote;
 use warnings;
 use strict;
 use base 'Exporter';
