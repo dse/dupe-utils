@@ -7,6 +7,7 @@ use FindBin;
 use lib "${FindBin::Bin}/../../../../lib";
 
 use File::Find qw(finddepth);
+use Time::HiRes qw(gettimeofday);
 
 sub new {
     my ($class, %args) = @_;
@@ -21,15 +22,19 @@ sub run {
     my $verbose = $self->{verbose};
     my $sort = $self->{sort};
     my $save_autoflush = $progress ? STDERR->autoflush(1) : undef;
-    my $counter = 0;
+    my $counter_found = 0;
     my $counter_rm = 0;
     my $counter_rmdir = 0;
     my $counter_trees = 0;
     my $total_trees = scalar @dir;
+    my $last;
     my $wanted = sub {
         if ($progress) {
-            if (++$counter % 173 == 0) {
-                printf STDERR ("\r%d %d/%d %d f %d d\e[K", $counter, $counter_trees, $total_trees, $counter_rm, $counter_rmdir);
+            ++$counter_found;
+            my $now = gettimeofday();
+            if (!defined $last || $now >= $last + 0.1) {
+                printf STDERR ("\r%d found; tree %d of %d; %d f; %d d \e[K", $counter_found, $counter_trees, $total_trees, $counter_rm, $counter_rmdir);
+                $last = $now;
             }
         }
         my @lstat = lstat($_);
