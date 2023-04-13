@@ -13,9 +13,9 @@ use My::DupeGroup qw(group_dupes);
 while (<>) {
     s{\R\z}{};
     my ($ver, @fields) = split();
-    my ($dev, $ino, $size, $filename);
+    my ($dev, $ino, $size, $mtime, $filename);
     if ($ver eq 'v1') {
-        ($dev, $ino, $size, $filename) = @fields;
+        ($dev, $ino, $size, $mtime, $filename) = @fields;
     } else {
         next;
     }

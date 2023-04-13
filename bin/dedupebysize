@@ -69,7 +69,7 @@ if (!$dirs_only) {
         if ($ver eq 'v1') {
             ++$counter_checked;
             printf STDERR ("\r%d checked \e[K", $counter_checked) if $progress && tick();
-            my ($dev, $ino, $size, $pathname) = @data;
+            my ($dev, $ino, $size, $mtime, $pathname) = @data;
             my $dev_ino = "$dev,$ino";
             push(@{$by_size_dev_ino{$size}{$dev_ino}}, $pathname);
             print("$size $dev $ino $pathname\n");

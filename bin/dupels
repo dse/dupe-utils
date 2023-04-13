@@ -33,4 +33,4 @@ done
 if (( nodirs )) ; then
     findcmd+=(.)
 fi
-exec "${findcmd[@]}" -type f "$@" -printf 'v1 %D %i %s %p\n'
+exec "${findcmd[@]}" -type f "$@" -printf 'v1 %D %i %s %Ts %p\n'
