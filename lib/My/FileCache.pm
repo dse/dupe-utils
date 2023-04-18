@@ -19,11 +19,15 @@ There are no magical import semantics involving which package you're
 using L<My::FileCache> from.  There is only one pool of filehandles,
 and it is accessible from all calling modules.
 
-Converting this module into a class seems trivial.
+(Converting this module into a class seems trivial.)
 
 =item *
 
 This package preserves file offsets, a la L<seek(2)>/L<tell(2)>.
+
+=item *
+
+This package is only capable of opening files for reading.
 
 =back
 
