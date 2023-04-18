@@ -3,6 +3,8 @@
 use warnings;
 use strict;
 
+# dedupe by FILE CONTENTS
+
 use Getopt::Long;
 
 use FindBin;
@@ -11,11 +13,15 @@ use My::DupeGroup qw(group_dupes);
 use My::ShellQuote qw(shell_quote);
 use My::GetFileInfo qw(get_file_info);
 
+use constant ASCENDING => 1;
+use constant DESCENDING => -1;
+
 our $force    = 0;
 our $verbose  = 0;
 our $progress = 0;
 our $sort     = 0;
 our $dry_run  = 0;
+our $order    = ASCENDING;
 Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
     'f|force'    => sub { $dry_run = 0; $force = 1; },
@@ -23,6 +29,8 @@ Getopt::Long::GetOptions(
     'p|progress' => \$progress,
     's|sort'     => \$sort,
     'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
+    'asc|ascending'   => sub { $order = ASCENDING; },
+    'desc|descending' => sub { $order = DESCENDING; },
 ) or die(":-(\n");
 if (!$force && !$dry_run) {
     die("either -f/--force or -n/--dry-run must be specified\n");
@@ -30,53 +38,66 @@ if (!$force && !$dry_run) {
 
 $progress &&= -t 2;
 
-my %by_size_dev_ino;
+# Group filenames of the same inode, so we only read from one of those
+# filenames ever.  An "inode" here is an inode's number preceded by
+# its device number, uniqifying inodes across filesystems.
+my %links_by_size_inode;
 my $sub = sub {
     my ($dev, $ino, $size, $mtime, $pathname) = @_;
-    my $dev_ino = "$dev,$ino";
-    push(@{$by_size_dev_ino{$size}{$dev_ino}}, $pathname);
+    my $inode = "$dev,$ino";
+    push(@{$links_by_size_inode{$size}{$inode}}, $pathname);
 };
+
+# Read from stdin and/or files and/or traverse directories.
 get_file_info({ sub => $sub }, @ARGV);
 
-my @size = sort { $b <=> $a } keys %by_size_dev_ino; # descending order
-# my @size = sort { $b <=> $a } keys %by_size_dev_ino; # ascending order
+my @size;
+if ($order == ASCENDING) {
+    # remove small duplicates first
+    @size = sort { $a <=> $b } keys %links_by_size_inode;
+} elsif ($order == DESCENDING) {
+    # remove large duplicates first
+    @size = sort { $b <=> $a } keys %links_by_size_inode;
+} else {
+    die("UNEXPECTED: order must be ascending or descending");
+}
 
 foreach my $size (@size) {
-    my $by_dev_ino = $by_size_dev_ino{$size};
-    # $by_dev_ino->{$dev_ino} = [$pathname, ...]
-    next if scalar keys %$by_dev_ino < 2; # one dev/ino means no dupes
-    my @dev_ino = sort keys %$by_dev_ino;
-    my %dev_ino;
-    foreach my $dev_ino (@dev_ino) {
-        foreach my $filename (@{$by_dev_ino->{$dev_ino}}) {
-            $dev_ino{$filename} = $dev_ino;
+    my @inodes = keys %{$links_by_size_inode{$size}};
+    next if scalar @inodes < 2;
+    my @filenames_to_read = sort map { $links_by_size_inode{$size}->{$_}->[0] } @inodes;
+    my %inodes_by_filename;
+    my %links_by_inode;
+    foreach my $inode (@inodes) {
+        $links_by_inode{$inode} = $links_by_size_inode{$size}{$inode};
+        foreach my $filename (@{$links_by_size_inode{$size}{$inode}}) {
+            $inodes_by_filename{$filename} = $inode;
         }
     }
-    my @files = map { $by_dev_ino->{$_}->[0] } @dev_ino;
-    my @groups = group_dupes(@files);
-    foreach my $group (sort { $a->[0] cmp $b->[0] } @groups) {
-        my ($first, @other) = sort @$group;
-        if ($force) {
-            foreach my $other (@other) {
-                my $dev_ino = $dev_ino{$other};
-                my @unlink = sort @{$by_dev_ino->{$dev_ino}};
-                foreach my $unlink (@unlink) {
-                    if (!unlink($unlink)) {
-                        warn("$unlink: $!\n");
+    my @duplicate_groups = group_dupes(@filenames_to_read); # the dirty work
+    foreach my $duplicate_group (sort { $a->[0] cmp $b->[0] } @duplicate_groups) {
+        my ($file_to_keep, @files_to_delete) = sort @$duplicate_group;
+        if ($dry_run) {
+            my $inode_to_keep = $inodes_by_filename{$file_to_keep};
+            my @files_to_keep = @{$links_by_inode{$inode_to_keep}};
+            foreach my $file_to_keep (@files_to_keep) {
+                printf("# keep %s # %s\n", $file_to_keep, $inode_to_keep);
+            }
+        }
+        foreach my $file_to_delete (@files_to_delete) {
+            my $inode_to_delete = $inodes_by_filename{$file_to_delete};
+            my @links_to_delete = sort @{$links_by_inode{$inode_to_delete}};
+            foreach my $link_to_delete (@links_to_delete) {
+                if ($force) {
+                    if (!unlink($link_to_delete)) {
+                        warn("$link_to_delete: $!\n");
                     } else {
-                        warn("rm $unlink\n") if $verbose;
+                        warn("rm $link_to_delete\n") if $verbose;
                     }
                 }
-            }
-        } else {
-            my $first_dev_ino = $dev_ino{$first};
-            foreach my $keep (sort @{$by_dev_ino->{$first_dev_ino}}) {
-                printf("# keep %s # %s\n", shell_quote($keep), $first_dev_ino);
-            }
-            foreach my $other (@other) {
-                my $dev_ino = $dev_ino{$other};
-                my @unlink = sort @{$by_dev_ino->{$dev_ino}};
-                printf("rm     %s # %s\n", shell_quote($_), $dev_ino) foreach @unlink;
+                if ($dry_run) {
+                    printf("rm %s # %s\n", shell_quote($link_to_delete), $inode_to_delete);
+                }
             }
         }
     }
