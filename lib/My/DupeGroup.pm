@@ -72,9 +72,7 @@ our @EXPORT_OK = qw(group_dupes);
 
 use Fcntl qw(SEEK_SET);
 
-our $MAXOPEN = 16;
 our $BYTES = 4096;
-our $touched_counter = 0;
 
 use FindBin;
 use lib "${FindBin::Bin}/../../lib";
