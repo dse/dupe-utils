@@ -2,6 +2,33 @@ package My::FileCache;
 use warnings;
 use strict;
 
+=head1 NAME
+
+My::FileCache - Keep more files open than the system permits
+
+=head1 DESCRIPTION
+
+This is basically the same as Perl's L<FileCache> module, but with a
+couple of differences:
+
+=over 4
+
+=item *
+
+There are no magical import semantics involving which package you're
+using L<My::FileCache> from.  There is only one pool of filehandles,
+and it is accessible from all calling modules.
+
+Converting this module into a class seems trivial.
+
+=item *
+
+This package preserves file offsets, a la L<seek(2)>/L<tell(2)>.
+
+=back
+
+=cut
+
 use base 'Exporter';
 our @EXPORT_OK = qw(cache_open cache_close cache_close_all);
 
@@ -55,7 +82,10 @@ sub cache_open {
     my $fh;
     if (!open($fh, '<:raw', $file)) {
         $fh = undef;
-        if ($!{EMFILE} || $!{ENFILE}) { # see open(2)
+        # EMFILE - per-process limit no. open files reached
+        # ENFILE - system-wide limit no. open files reached
+        # see open(2); see getrlimit(2) regarding EMFILE.
+        if ($!{EMFILE} || $!{ENFILE}) {
             if ($maxopen >= 8) {
                 $maxopen -= 4;
                 goto tryagain;
