@@ -95,9 +95,9 @@ sub group_dupes {
                 my $data;
                 my $bytes = sysread($fh, $data, $BYTES);
                 if (!defined $bytes) { # error reading
-                    cache_close($fh);
+                    cache_close($filename);
                 } elsif (!$bytes) { # EOF, no more data
-                    cache_close($fh);
+                    cache_close($filename);
                     push(@done, $filename);
                 } else {        # we just read some data
                     push(@{$group{$data}}, $filename) if defined $data;
