@@ -3,6 +3,69 @@ use warnings;
 use strict;
 no strict 'refs';      ## no critic (ProhibitNoStrict) [for FileCache]
 
+=head1 NAME
+
+My::DupeGroup - Find duplicates among a number of files.
+
+=head1 DESCRIPTION
+
+This package exports a subroutine called C<group_dupes> that reads a
+number of specified files, and finds and returns groups of files with
+the same content among them.
+
+Let's say files A, B, and C have the exact same contents; files D and
+E have the exact same contents up to a specific offset; file F has the
+exact same contents as files A through C up to a later offset; and
+file G is the only file that has its contents.
+
+Before reading, all files are assumed to have the same content:
+
+    [A, B, C, D, E, F, G]
+
+Next we read a chunk of data from each file.  Since G is the only file
+that contains its first chunk, its filehandle is closed and it will
+not be returned as part of any group.  All of the other files have the
+same contents up to a certain offset and are part of the same group:
+
+    [A, B, C, D, E, F]
+
+Let's read additional chunks from the six remaining files.  The chunks
+of data are all going to be the same until they're not.  Let's say
+files D and E yield identical chunks of data, and files A through C
+and F yield another, different, identical chunk of data.  At this point,
+files D and E split off into a separate group.
+
+    [A, B, C, F]   [D, E]
+
+Let's say at a later point file F contains a different chunk of data
+then A, B, and C (which all have the same contents).  F is split off
+from the group and will not be returned as part of any group.
+
+    [A, B, C]   [D, E]
+
+During the remainder of execution, files A, B, and C will contain the
+same data as one another; and files D and E will contain the same data
+as one another.  After all files are closed, C<group_dupes> returns an
+array of two array references like so:
+
+    my @groups = group_dupes("A", "B", "C", "D", "E", "F");
+
+    #   ==> (["A", "B", "C"], ["D", "E"])
+
+If you happen to pass a set of filenames of varying sizes, no two
+files of different file sizes (in bytes) will be a part of the same
+group of files returned.  There is really no point in passing files
+that are not the same size in bytes, but as part of its sanity checks,
+this code checks for EOF, making it safe to do it.
+
+=head1 BUGS
+
+The C<group_dupes> subroutine assumes that the contents of the files
+it is supplied with will not change during execution.  When this
+happens, behavior is undefined.
+
+=cut
+
 use base 'Exporter';
 our @EXPORT = qw();
 our @EXPORT_OK = qw(group_dupes);
