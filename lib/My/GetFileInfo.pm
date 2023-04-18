@@ -53,6 +53,7 @@ sub get_file_info_from_file {
     }
     while (<$fh>) {
         s{\R\z}{};
+        # v1 <dev> <ino> <size> <mtime> <pathname>
         my ($ver, @data) = split();
         next if $ver ne 'v1';
         my ($dev, $ino, $size, $mtime, $pathname) = @data;

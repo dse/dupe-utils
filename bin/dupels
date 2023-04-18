@@ -34,3 +34,4 @@ if (( nodirs )) ; then
     findcmd+=(.)
 fi
 exec "${findcmd[@]}" -type f "$@" -printf 'v1 %D %i %s %Ts %p\n'
+# v1 <dev> <ino> <size> <mtime> <pathname>
