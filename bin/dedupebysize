@@ -3,14 +3,13 @@
 use warnings;
 use strict;
 
-use File::Find qw(find);
 use Getopt::Long;
-use FindBin;
 
+use FindBin;
 use lib "${FindBin::Bin}/../lib";
 use My::DupeGroup qw(group_dupes);
 use My::ShellQuote qw(shell_quote);
-use Data::Dumper qw(Dumper);
+use My::GetFileInfo qw(get_file_info);
 
 our $force    = 0;
 our $verbose  = 0;
@@ -31,59 +30,22 @@ if (!$force && !$dry_run) {
 
 $progress &&= -t 2;
 
-warn("arguments: @ARGV\n");
-my @files = grep { -f $_ || $_ eq '-' } @ARGV;
-warn("files: @files\n");
-my @dirs  = grep { -d $_ } @ARGV;
-warn("dirs: @dirs\n");
-my $dirs_only = scalar @dirs && !scalar @files;
-
 my %by_size_dev_ino;
-my $counter_found = 0;
-my $counter_checked = 0;
-
-my $wanted = sub {
-    ++$counter_found;
-    printf STDERR ("\r%d found \e[K") if $progress && tick();
-    my @lstat = lstat($_);
-    return unless @lstat;
-    return if !-f _;
-    my $dev = $lstat[0];
-    my $ino = $lstat[1];
-    my $size = $lstat[7];
+my $sub = sub {
+    my ($dev, $ino, $size, $mtime, $pathname) = @_;
     my $dev_ino = "$dev,$ino";
-    push(@{$by_size_dev_ino{$size}{$dev_ino}}, $File::Find::name);
-    print("$size $dev $ino $File::Find::name\n");
+    push(@{$by_size_dev_ino{$size}{$dev_ino}}, $pathname);
 };
+get_file_info({ sub => $sub }, @ARGV);
 
-foreach my $dir (@dirs) {
-    find({ wanted => $wanted }, $dir);
-}
-printf STDERR ("\r\e[K%d found\n", $counter_found) if $progress;
+my @size = sort { $b <=> $a } keys %by_size_dev_ino; # descending order
+# my @size = sort { $b <=> $a } keys %by_size_dev_ino; # ascending order
 
-if (!$dirs_only) {
-    @ARGV = @files;
-    while (<>) {
-        s{\R\z}{};
-        my ($ver, @data) = split();
-        if ($ver eq 'v1') {
-            ++$counter_checked;
-            printf STDERR ("\r%d checked \e[K", $counter_checked) if $progress && tick();
-            my ($dev, $ino, $size, $mtime, $pathname) = @data;
-            my $dev_ino = "$dev,$ino";
-            push(@{$by_size_dev_ino{$size}{$dev_ino}}, $pathname);
-            print("$size $dev $ino $pathname\n");
-        }
-    }
-    printf STDERR ("\r\e[K%d checked\n", $counter_checked) if $progress;
-}
-
-foreach my $size (sort { $b <=> $a } keys %by_size_dev_ino) {
-    warn("finding duplicate $size-byte files\n");
+foreach my $size (@size) {
     my $by_dev_ino = $by_size_dev_ino{$size};
-    next if scalar keys %$by_dev_ino < 1; # really, 2
+    # $by_dev_ino->{$dev_ino} = [$pathname, ...]
+    next if scalar keys %$by_dev_ino < 2; # one dev/ino means no dupes
     my @dev_ino = sort keys %$by_dev_ino;
-    next if scalar @dev_ino < 1; # really, 2
     my %dev_ino;
     foreach my $dev_ino (@dev_ino) {
         foreach my $filename (@{$by_dev_ino->{$dev_ino}}) {
