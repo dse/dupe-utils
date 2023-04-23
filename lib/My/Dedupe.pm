@@ -94,14 +94,14 @@ sub check_files_of_size {
                     } else {
                         if ($self->{verbose}) {
                             $self->{progress}->clear();
-                            warn("rm $link_to_delete\n");
+                            warn("rm $link_to_delete # [1]\n");
                             $self->{progress}->printf("  chekcing %d-byte files ...", $size);
                         }
                     }
                 }
                 if ($self->{dry_run}) {
                     $self->{progress}->clear();
-                    printf("rm %s # %s\n", shell_quote($link_to_delete), $inode_to_delete);
+                    printf("rm %s # %s [2]\n", shell_quote($link_to_delete), $inode_to_delete);
                     $self->{progress}->printf("  chekcing %d-byte files ...", $size);
                 }
             }
