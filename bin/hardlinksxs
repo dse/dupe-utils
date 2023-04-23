@@ -55,14 +55,21 @@ sub cleanup {
                           $file_checked_count,
                           $file_removed_count);
     };
+
     finddepth({
         preprocess => sub { return sort @_; }, # predictable order
         wanted => sub {
             $file_found_count += 1;
             my ($dev, $ino, $mode, $nlink) = lstat($_);
-            return if !defined $dev || !defined $ino || !-f _ || $nlink < 2;
+            if (!defined $dev || !defined $ino || !-f _ || $nlink < 2) {
+                &$sub();
+                return;
+            }
             my $rel = substr($File::Find::name, $prefixlen);
-            return if $found{$rel};
+            if ($found{$rel}) {
+                &$sub();
+                return;
+            }
             $found{$rel} = 1;
             $file_checked_count += 1;
             &$sub();
