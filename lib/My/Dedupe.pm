@@ -40,14 +40,12 @@ sub run {
     my ($self) = @_;
 
     $self->{progress}->clear();
-    printf("  %d files found\n", $self->{file_count});
-
     my @size;
     my $order = $self->{order};
-    if ($order == ASCENDING) {
+    if ($order > 0) {
         # remove small duplicates first
         @size = sort { $a <=> $b } keys %{$self->{links_by_size_inode}};
-    } elsif ($order == DESCENDING) {
+    } elsif ($order < 0) {
         # remove large duplicates first
         @size = sort { $b <=> $a } keys %{$self->{links_by_size_inode}};
     } else {
