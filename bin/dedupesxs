@@ -1,0 +1,93 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+
+use Getopt::Long;
+
+use File::Find qw(find finddepth);
+use File::Spec::Functions qw(abs2rel rel2abs);
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+use My::Dedupe qw();
+
+use constant ASCENDING => 1;
+use constant DESCENDING => -1;
+
+our $force    = 0;
+our $verbose  = 0;
+our $dry_run  = 0;
+our $order    = DESCENDING;
+
+Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
+Getopt::Long::GetOptions(
+    'f|force'    => sub { $dry_run = 0; $force = 1; },
+    'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
+    'v|verbose+' => \$verbose,
+    'asc|ascending'   => sub { $order = ASCENDING; },
+    'desc|descending' => sub { $order = DESCENDING; },
+) or die(":-(\n");
+if (!$force && !$dry_run) {
+    die("either -f/--force or -n/--dry-run must be specified\n");
+}
+
+# Keep track of relative pathnames found, so if we delete dir1/file1
+# and dir3/file1 in an earlier round, we ignore file1 in later rounds.
+my %found;
+
+my @dirs = @ARGV;
+while (scalar @dirs >= 2) {
+    cleanup(@dirs);
+    shift(@dirs);
+}
+
+sub cleanup {
+    my ($base_dir, @other_dirs) = @_;
+    my $prefix = "$base_dir/";
+    my $prefixlen = length($prefix);
+    warn(sprintf("# finding files in $base_dir and %d other places\n", scalar @other_dirs));
+    my $progress = My::Progress->new(tick => 1);
+
+    my $file_found_count = 0;
+    my $file_checked_count = 0;
+    my $file_removed_count = 0;
+
+    finddepth({
+        preprocess => sub { return sort @_; }, # predictable order
+        wanted => sub {
+            $file_found_count += 1;
+            my ($dev, $ino, $mode, $nlink, undef, undef, undef, $size) = lstat($_);
+            if (!defined $dev || !defined $ino || !-f _ || $nlink < 2) {
+                return;
+            }
+            my $rel = substr($File::Find::name, $prefixlen);
+            if ($found{$rel}) {
+                return;
+            }
+            $found{$rel} = 1;
+
+            my $dedupe = My::Dedupe->new();
+            $dedupe->{dry_run} = $dry_run;
+            $dedupe->{force} = $force;
+            $dedupe->{order} = $order;
+            $dedupe->{verbose} = $verbose;
+            $dedupe->{progress} = $progress;
+
+            foreach my $other_dir (@other_dirs) {
+                my $abs = "$other_dir/$rel";
+                my ($dev2, $ino2, $mode2, $nlink2,
+                    undef, undef, undef, $size2,
+                    undef, $mtime2) = lstat($abs);
+                next if !defined $dev2 || !defined $ino2 || $nlink2 < 2;
+                next if $dev2 != $dev || $ino2 != $ino;
+                $dedupe->add_file($abs, $dev2, $ino2, $size2, $mtime2);
+            }
+
+            $dedupe->run();
+        },
+        no_chdir => 1,
+    }, $base_dir);
+}
