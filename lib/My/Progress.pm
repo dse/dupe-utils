@@ -7,6 +7,15 @@ use Time::HiRes qw(gettimeofday);
 
 our $COLS;
 
+our $tty;
+BEGIN {
+    if (!open($tty, '>', '/dev/tty')) {
+        undef $tty;             # force the issue
+    } else {
+        $tty->autoflush(1);
+    }
+}
+
 sub new {
     my ($class, %args) = @_;
     my $self = bless(\%args, $class);
@@ -16,7 +25,7 @@ sub new {
 }
 
 sub incr {
-    return if !-t 2;
+    return if !defined $tty;
     my $self = shift;
     return if !$self->{enabled};
 
@@ -57,7 +66,7 @@ sub incr {
 }
 
 sub incr2 {
-    return if !-t 2;
+    return if !defined $tty;
     my ($self) = @_;
     return if !$self->{enabled};
 
@@ -66,7 +75,7 @@ sub incr2 {
 }
 
 sub incr3 {
-    return if !-t 2;
+    return if !defined $tty;
     my ($self) = @_;
     return if !$self->{enabled};
 
@@ -75,7 +84,7 @@ sub incr3 {
 }
 
 sub incr4 {
-    return if !-t 2;
+    return if !defined $tty;
     my ($self) = @_;
     return if !$self->{enabled};
 
@@ -84,28 +93,27 @@ sub incr4 {
 }
 
 sub clear {
-    return if !-t 2;
+    return if !defined $tty;
     my ($self) = @_;
     return if !$self->{enabled};
     p("\r\e[K");
 }
 
 sub DESTROY {
-    return if !-t 2;
+    return if !defined $tty;
     my ($self) = @_;
     return if !$self->{enabled};
     $self->clear();
 }
 
 sub p {
-    my $af = STDERR->autoflush(1);
+    return if !defined $tty;
     my $str = shift;
-    print STDERR (scalar @_ ? sprintf($str, @_) : $str);
-    STDERR->autoflush($af);
+    print $tty (scalar @_ ? sprintf($str, @_) : $str);
 }
 
 sub compute_cols {
-    return if !-t 2;
+    return if !defined $tty;
     my $size = `stty size`;
     return if !defined $size;
     my (undef, $cols) = split(' ', $size);
