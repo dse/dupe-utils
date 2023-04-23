@@ -12,13 +12,13 @@ use lib "${FindBin::Bin}/../lib";
 use My::DupeGroup qw(group_dupes);
 use My::ShellQuote qw(shell_quote);
 use My::GetFileInfo qw(get_file_info);
+use My::Progress qw();
 
 use constant ASCENDING => 1;
 use constant DESCENDING => -1;
 
 our $force    = 0;
 our $verbose  = 0;
-our $progress = 0;
 our $sort     = 0;
 our $dry_run  = 0;
 our $order    = DESCENDING;
@@ -26,7 +26,6 @@ Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
     'f|force'    => sub { $dry_run = 0; $force = 1; },
     'v|verbose+' => \$verbose,
-    'p|progress' => \$progress,
     's|sort'     => \$sort,
     'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
     'asc|ascending'   => sub { $order = ASCENDING; },
@@ -36,16 +35,19 @@ if (!$force && !$dry_run) {
     die("either -f/--force or -n/--dry-run must be specified\n");
 }
 
-$progress &&= -t 2;
+my $progress = My::Progress->new(tick => 1);
 
 # Group filenames of the same inode, so we only read from one of those
 # filenames ever.  An "inode" here is an inode's number preceded by
 # its device number, uniqifying inodes across filesystems.
 my %links_by_size_inode;
+my $file_count = 0;
 my $sub = sub {
     my ($dev, $ino, $size, $mtime, $pathname) = @_;
     my $inode = "$dev,$ino";
     push(@{$links_by_size_inode{$size}{$inode}}, $pathname);
+    $file_count += 1;
+    $progress->printf("  %d files", $file_count);
 };
 
 # Read from stdin and/or files and/or traverse directories.
@@ -62,7 +64,10 @@ if ($order == ASCENDING) {
     die("UNEXPECTED: order must be ascending or descending");
 }
 
+$progress->{tick} = 0;
+
 foreach my $size (@size) {
+    $progress->printf("  chekcing %d-byte files ...", $size);
     my @inodes = keys %{$links_by_size_inode{$size}};
     next if scalar @inodes < 2;
     my @filenames_to_read = sort map { $links_by_size_inode{$size}->{$_}->[0] } @inodes;
@@ -81,7 +86,9 @@ foreach my $size (@size) {
             my $inode_to_keep = $inodes_by_filename{$file_to_keep};
             my @files_to_keep = @{$links_by_inode{$inode_to_keep}};
             foreach my $file_to_keep (@files_to_keep) {
+                $progress->clear();
                 printf("# keep %s # %s\n", $file_to_keep, $inode_to_keep);
+                $progress->printf("  chekcing %d-byte files ...", $size);
             }
         }
         foreach my $file_to_delete (@files_to_delete) {
@@ -90,15 +97,24 @@ foreach my $size (@size) {
             foreach my $link_to_delete (@links_to_delete) {
                 if ($force) {
                     if (!unlink($link_to_delete)) {
+                        $progress->clear();
                         warn("$link_to_delete: $!\n");
+                        $progress->printf("  chekcing %d-byte files ...", $size);
                     } else {
-                        warn("rm $link_to_delete\n") if $verbose;
+                        if ($verbose) {
+                            $progress->clear();
+                            warn("rm $link_to_delete\n");
+                            $progress->printf("  chekcing %d-byte files ...", $size);
+                        }
                     }
                 }
                 if ($dry_run) {
+                    $progress->clear();
                     printf("rm %s # %s\n", shell_quote($link_to_delete), $inode_to_delete);
+                    $progress->printf("  chekcing %d-byte files ...", $size);
                 }
             }
         }
     }
 }
+$progress->clear();

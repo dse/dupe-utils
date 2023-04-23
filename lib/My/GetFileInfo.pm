@@ -9,20 +9,27 @@ use File::Find qw(find);
 
 sub get_file_info {
     my ($options, @args) = @_;
-    my $sub = (ref $options eq 'HASH') ? $options->{sub} : (ref $options eq 'CODE') ? $options : undef;
-    die("no subroutine specified") if !defined $sub || ref $sub ne 'CODE';
+    my $sub = $options->{sub};
+    my $sub_all = $options->{sub_all};
+    if (defined $sub && ref $sub ne 'CODE') {
+        undef $sub;
+    }
+    if (defined $sub_all && ref $sub_all ne 'CODE') {
+        undef $sub_all;
+    }
+    die("no subroutine specified") if !defined $sub;
 
     if (!scalar @args) {
         push(@args, '-');
     }
     my @files = grep { -f $_ || $_ eq '-' } @args;
     my @dirs = grep { -d $_ } @args;
-    get_file_info_via_find($sub, $options, $_) foreach @dirs;
-    get_file_info_from_file($sub, $options, $_) foreach @files;
+    get_file_info_via_find($sub, $sub_all, $options, $_) foreach @dirs;
+    get_file_info_from_file($sub, $sub_all, $options, $_) foreach @files;
 }
 
 sub get_file_info_via_find {
-    my ($sub, $options, $dir) = @_;
+    my ($sub, $sub_all, $options, $dir) = @_;
     my $wanted = sub {
         my @lstat = lstat($_);
         return unless @lstat;
@@ -38,7 +45,7 @@ sub get_file_info_via_find {
 }
 
 sub get_file_info_from_file {
-    my ($sub, $options, $file) = @_;
+    my ($sub, $sub_all, $options, $file) = @_;
     my $fh;
     if ($file eq '-') {
         if (!open($fh, '<-')) {
