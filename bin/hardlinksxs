@@ -82,7 +82,7 @@ sub cleanup {
                     $file_removed_count += 1;
                     if (unlink($abs)) {
                         $progress->clear();
-                        warn("rm $abs # [5]\n") if $verbose;
+                        warn("rm $abs\n") if $verbose;
                         &$sub();
                     } else {
                         $progress->clear();
@@ -91,7 +91,7 @@ sub cleanup {
                     }
                 } else {
                     $progress->clear();
-                    printf("rm %s # [6]\n", shell_quote($abs));
+                    printf("rm %s\n", shell_quote($abs));
                     &$sub();
                 }
             }

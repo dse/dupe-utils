@@ -60,7 +60,7 @@ sub run {
             if (unlink($_)) {
                 if ($verbose) {
                     $progress->clear();
-                    warn("rm $File::Find::name # [3]\n");
+                    warn("rm $File::Find::name\n");
                 }
             } else {
                 $progress->clear();
@@ -70,7 +70,7 @@ sub run {
             $rm_file_count += 1;
             if ($verbose) {
                 $progress->clear();
-                warn("rm $File::Find::name # [4]\n");
+                warn("rm $File::Find::name\n");
             }
         }
         &$sub();
