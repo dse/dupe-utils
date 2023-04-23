@@ -4,38 +4,48 @@ use strict;
 use File::Find qw(find);
 use File::Spec::Functions qw(abs2rel rel2abs);
 use Getopt::Long;
+
 our $force = 0;
 our $verbose = 0;
 our $progress = 0;
+
 Getopt::Long::Configure(qw());
 Getopt::Long::GetOptions(
     'f|force' => \$force,
     'v|verbose+' => \$verbose,
     'p|progress' => \$progress,
 ) or die(":-(\n");
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+use My::ShellQuote qw(shell_quote);
+use My::Progress;
+
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
-my @dirs = @ARGV;
+
+# Keep track of relative pathnames found, so if we delete dir1/file1
+# and dir3/file1 in an earlier round, we ignore file1 in later rounds.
 my %found;
+
+my @dirs = @ARGV;
 while (scalar @dirs >= 2) {
     cleanup(@dirs);
     shift(@dirs);
 }
+
 sub cleanup {
     my ($base_dir, @other_dirs) = @_;
     my $prefix = "$base_dir/";
     my $prefixlen = length($prefix);
     warn("# finding files in $base_dir\n");
-    my $count = 0;
-    warn("# progress\n") if $progress && -t 2;
+    my $progress = My::Progress->new();
     finddepth({
         preprocess => sub { return sort @_; }, # predictable order
         wanted => sub {
-            $count += 1;
-            print STDERR ("\e[K  $count\r") if -t 2 && $progress;
+            $progress->incr();
             my ($dev, $ino, $mode, $nlink) = lstat($_);
             return if !defined $dev || !defined $ino || !-f _ || $nlink < 2;
-            return if substr($File::Find::name, 0, $prefixlen) ne $prefix;
             my $rel = substr($File::Find::name, $prefixlen);
             return if $found{$rel};
             $found{$rel} = 1;
@@ -46,28 +56,18 @@ sub cleanup {
                 next if $dev2 != $dev || $ino2 != $ino;
                 if ($force) {
                     if (unlink($abs)) {
+                        $progress->clear();
                         warn("rm $abs\n") if $verbose;
                     } else {
+                        $progress->clear();
                         warn("$abs: $!\n");
                     }
                 } else {
-                    printf("rm %s\n", shellquote($abs));
+                    printf("rm %s\n", shell_quote($abs));
                 }
             }
         },
         no_chdir => 1,
     }, $base_dir);
-    print STDERR ("\r\e[K$count done\n") if -t 2 && $progress;
-}
-sub shellquote {
-    my ($string) = @_;
-    for ($string) {
-        # stolen from String::ShellQuote to reduce dependencies
-        s/'/'\\''/g;
-        s|((?:'\\''){2,})|q{'"} . (q{'} x (length($1) / 4)) . q{"'}|ge;
-        $_ = "'$_'";
-        s/^''//;
-        s/''$//;
-    }
-    return $string;
+    undef $progress;
 }
