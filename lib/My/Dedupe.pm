@@ -8,6 +8,8 @@ use constant DESCENDING => -1;
 use FindBin;
 use lib "${FindBin::Bin}/../../lib";
 use My::Progress qw();
+use My::DupeGroup qw(group_dupes);
+use My::ShellQuote qw(shell_quote);
 
 sub new {
     my $class = shift;
