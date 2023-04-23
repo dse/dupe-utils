@@ -60,7 +60,7 @@ sub check_files_of_size {
     my ($self, $size) = @_;
     $self->{progress}->printf("  chekcing %d-byte files ...", $size);
     my @inodes = keys %{$self->{links_by_size_inode}->{$size}};
-    next if scalar @inodes < 2;
+    return if scalar @inodes < 2;
     my @filenames_to_read = sort map { $self->{links_by_size_inode}->{$size}->{$_}->[0] } @inodes;
     my %inodes_by_filename;
     my %links_by_inode;
