@@ -16,11 +16,11 @@ our $COLS;
 our $tty;
 our $clear = 1;
 INIT {
-    if (!open($tty, '>', '/dev/tty')) {
-        undef $tty;             # force the issue
-    } else {
+    if (open($tty, '>', '/dev/tty')) {
         $COLS = compute_cols();
         $tty->autoflush(1);
+    } else {
+        undef $tty;             # force the issue
     }
 }
 
