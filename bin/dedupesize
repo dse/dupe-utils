@@ -47,11 +47,13 @@ my $sub = sub {
     my $inode = "$dev,$ino";
     push(@{$links_by_size_inode{$size}{$inode}}, $pathname);
     $file_count += 1;
-    $progress->printf("  %d files", $file_count);
+    $progress->printf("  %d files found", $file_count);
 };
 
 # Read from stdin and/or files and/or traverse directories.
 get_file_info({ sub => $sub }, @ARGV);
+$progress->clear();
+printf("  %d files found\n", $file_count);
 
 my @size;
 if ($order == ASCENDING) {
