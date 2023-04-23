@@ -10,18 +10,24 @@ use lib "${FindBin::Bin}/../lib";
 use My::Cleanup::HardLinks::Fast;
 
 our $force    = 0;
+our $dry_run  = 0;
 our $verbose  = 0;
 our $progress = 0;
 our $sort     = 0;
 Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
-    'f|force' => \$force,
+    'f|force'    => sub { $dry_run = 0; $force = 1; },
+    'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
     'v|verbose+' => \$verbose,
     'p|progress' => \$progress,
     's|sort'     => \$sort,
 ) or die(":-(\n");
+if (!$force && !$dry_run) {
+    die("either -f/--force or -n/--dry-run must be specified\n");
+}
 
 my $cleanup = My::Cleanup::HardLinks::Fast->new(force => $force,
+                                                dry_run => $dry_run,
                                                 verbose => $verbose,
                                                 progress => $progress);
 $cleanup->run(@ARGV);
