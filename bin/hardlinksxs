@@ -24,6 +24,8 @@ use lib "${FindBin::Bin}/../lib";
 use My::ShellQuote qw(shell_quote);
 use My::Progress qw();
 
+use File::Find qw(finddepth);
+
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
 
