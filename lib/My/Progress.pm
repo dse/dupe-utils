@@ -113,8 +113,4 @@ sub compute_cols {
     return $cols;
 }
 
-END {
-    clear_progress();
-}
-
 1;
