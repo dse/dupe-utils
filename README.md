@@ -31,3 +31,26 @@ those files for removal, it will remove all the other hard links too.
 
 `dedupesize` prefers to keep files whose names are earlier in
 lexicographic order.
+
+## hardlinkfast
+
+`hardlinkfast` is the quicker hard link remover.
+
+`hardlinkfast` searches for regular files with more than one link in
+the supplied directories or the current working directory.
+
+While searching for files, it checks each file's hard-link count and
+if it is two or greater, removes the link.  `hardlinkfast` will never
+remove a filename that's an only link.  (Assuming the file does not
+change in the brief amount of time between when it checks the number
+of hard links on the file and when it deletes the link.)
+
+`hardlinkfast` does not guarantee an order in which files are found.
+
+`hardlinkfast` is primarily a directory cleanup tool.  It does a
+depth-first file search, meaning it operates on the files within a
+directory then the directory itself.  If it removes all the files
+in a directory it will remove that directory.
+
+`hardlinkfast` works best if you have a large number of backups with
+files not having changed hard-linked together.
