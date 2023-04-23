@@ -60,7 +60,7 @@ sub cleanup {
         wanted => sub {
             $file_found_count += 1;
             my ($dev, $ino, $mode, $nlink, undef, undef, undef, $size) = lstat($_);
-            if (!defined $dev || !defined $ino || !-f _ || $nlink < 2) {
+            if (!defined $dev || !defined $ino || !-f _) {
                 return;
             }
             my $rel = substr($File::Find::name, $prefixlen);
@@ -82,7 +82,6 @@ sub cleanup {
                     undef, undef, undef, $size2,
                     undef, $mtime2) = lstat($abs);
                 next if !defined $dev2 || !defined $ino2 || $nlink2 < 2;
-                next if $dev2 != $dev || $ino2 != $ino;
                 $dedupe->add_file($abs, $dev2, $ino2, $size2, $mtime2);
             }
 
