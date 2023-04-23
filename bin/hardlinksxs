@@ -43,7 +43,7 @@ sub cleanup {
     my ($base_dir, @other_dirs) = @_;
     my $prefix = "$base_dir/";
     my $prefixlen = length($prefix);
-    warn("# finding files in $base_dir\n");
+    warn(sprintf("# finding files in $base_dir and %d other places\n", scalar @other_dirs));
     my $progress = My::Progress->new(tick => 1);
 
     my $file_found_count = 0;
@@ -64,7 +64,8 @@ sub cleanup {
             my $rel = substr($File::Find::name, $prefixlen);
             return if $found{$rel};
             $found{$rel} = 1;
-            $file_checked_count += 1 + scalar @other_dirs;
+            $file_checked_count += 1;
+            &$sub();
             foreach my $other_dir (@other_dirs) {
                 my $abs = "$other_dir/$rel";
                 my ($dev2, $ino2, $mode2, $nlink2) = lstat($abs);
