@@ -21,7 +21,7 @@ our $verbose  = 0;
 our $progress = 0;
 our $sort     = 0;
 our $dry_run  = 0;
-our $order    = ASCENDING;
+our $order    = DESCENDING;
 Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
     'f|force'    => sub { $dry_run = 0; $force = 1; },
