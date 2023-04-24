@@ -21,9 +21,13 @@ our $force    = 0;
 our $verbose  = 0;
 our $dry_run  = 0;
 our $order    = DESCENDING;
+our $minimum;
+our $maximum;
 
 Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
+    'min|minimum=i' => \$minimum,
+    'max|maximum=i' => \$maximum,
     'f|force'    => sub { $dry_run = 0; $force = 1; },
     'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
     'v|verbose+' => \$verbose,
@@ -60,6 +64,7 @@ sub cleanup {
         wanted => sub {
             $file_found_count += 1;
             my ($dev, $ino, $mode, $nlink, undef, undef, undef, $size, undef, $mtime) = lstat($_);
+            return if $size < $minimum || $size > $maximum;
             if (!defined $dev || !defined $ino || !-f _) {
                 return;
             }
@@ -75,6 +80,8 @@ sub cleanup {
             $dedupe->{order} = $order;
             $dedupe->{verbose} = $verbose;
             $dedupe->{progress} = $progress;
+            $dedupe->{minimum} = $minimum;
+            $dedupe->{maximum} = $maximum;
             $dedupe->add_file($File::Find::name, $dev, $ino, $size, $mtime);
 
             foreach my $other_dir (@other_dirs) {
@@ -82,6 +89,7 @@ sub cleanup {
                 my ($dev2, $ino2, $mode2, $nlink2,
                     undef, undef, undef, $size2,
                     undef, $mtime2) = my @lstat = lstat($abs);
+                return if $size2 < $minimum || $size2 > $maximum;
                 next if !-f _;
                 next if !defined $dev2 || !defined $ino2;
                 $dedupe->add_file($abs, $dev2, $ino2, $size2, $mtime2);

@@ -20,9 +20,13 @@ our $force    = 0;
 our $verbose  = 0;
 our $dry_run  = 0;
 our $order    = DESCENDING;
+our $minimum;
+our $maximum;
 
 Getopt::Long::Configure(qw(gnu_getopt no_ignore_case));
 Getopt::Long::GetOptions(
+    'min|minimum=i' => \$minimum,
+    'max|maximum=i' => \$maximum,
     'f|force'    => sub { $dry_run = 0; $force = 1; },
     'n|dry-run'  => sub { $dry_run = 1; $force = 0; },
     'v|verbose+' => \$verbose,
@@ -40,9 +44,12 @@ $dedupe->{force} = $force;
 $dedupe->{order} = $order;
 $dedupe->{verbose} = $verbose;
 $dedupe->{progress} = $progress;
+$dedupe->{minimum} = $minimum;
+$dedupe->{maximum} = $maximum;
 
 my $sub = sub {
     my ($dev, $ino, $size, $mtime, $pathname) = @_;
+    return if $size < $minimum || $size > $maximum;
     $dedupe->add_file($pathname, $dev, $ino, $size, $mtime);
 };
 
