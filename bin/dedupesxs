@@ -64,7 +64,8 @@ sub cleanup {
         wanted => sub {
             $file_found_count += 1;
             my ($dev, $ino, $mode, $nlink, undef, undef, undef, $size, undef, $mtime) = lstat($_);
-            return if $size < $minimum || $size > $maximum;
+            return if defined $minimum && $size < $minimum;
+            return if defined $maximum && $size > $maximum;
             if (!defined $dev || !defined $ino || !-f _) {
                 return;
             }
@@ -89,7 +90,8 @@ sub cleanup {
                 my ($dev2, $ino2, $mode2, $nlink2,
                     undef, undef, undef, $size2,
                     undef, $mtime2) = my @lstat = lstat($abs);
-                return if $size2 < $minimum || $size2 > $maximum;
+                return if defined $minimum && $size2 < $minimum;
+                return if defined $maximum && $size2 > $maximum;
                 next if !-f _;
                 next if !defined $dev2 || !defined $ino2;
                 $dedupe->add_file($abs, $dev2, $ino2, $size2, $mtime2);
