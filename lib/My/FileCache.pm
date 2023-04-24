@@ -95,10 +95,10 @@ sub cache_open {
                 $maxopen -= 4;
                 goto tryagain;
             } else {
-                croak("$file: $! (too few open files)");
+                confess("$file: $! (too few open files)");
             }
         }
-        croak("$file: $!");
+        confess("$file: $!");
     }
     $fh{$file} = $fh;
     $seq{$file} = ++$seq;
