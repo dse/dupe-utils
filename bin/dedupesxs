@@ -82,6 +82,7 @@ sub cleanup {
                 my ($dev2, $ino2, $mode2, $nlink2,
                     undef, undef, undef, $size2,
                     undef, $mtime2) = my @lstat = lstat($abs);
+                next if !-f _;
                 next if !defined $dev2 || !defined $ino2;
                 $dedupe->add_file($abs, $dev2, $ino2, $size2, $mtime2);
             }
