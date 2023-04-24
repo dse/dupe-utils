@@ -49,7 +49,8 @@ $dedupe->{maximum} = $maximum;
 
 my $sub = sub {
     my ($dev, $ino, $size, $mtime, $pathname) = @_;
-    return if $size < $minimum || $size > $maximum;
+    return if defined $minimum && $size < $minimum;
+    return if defined $maximum && $size > $maximum;
     $dedupe->add_file($pathname, $dev, $ino, $size, $mtime);
 };
 
