@@ -37,6 +37,7 @@ use base 'Exporter';
 our @EXPORT_OK = qw(cache_open cache_close cache_close_all);
 
 use Fcntl qw(SEEK_CUR SEEK_SET);
+use Carp qw(croak);
 
 our $maxopen;
 BEGIN {
